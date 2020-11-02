@@ -1,0 +1,13 @@
+diff --git a/src/codegen/code-stub-assembler.cc b/src/codegen/code-stub-assembler.cc
+index 16fd384..8bf435a 100644
+--- a/src/codegen/code-stub-assembler.cc
++++ b/src/codegen/code-stub-assembler.cc
+@@ -2888,7 +2888,7 @@ TNode<Smi> CodeStubAssembler::BuildAppendJSArray(ElementsKind kind,
+       [&](TNode<Object> arg) {
+         TryStoreArrayElement(kind, &pre_bailout, elements, var_length.value(),
+                              arg);
+-        Increment(&var_length);
++        Increment(&var_length, 3);
+       },
+       first);
+   {
